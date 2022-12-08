@@ -1,0 +1,143 @@
+---
+title: "Random_forest"
+author: "Team X"
+date: "2022-12-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(randomForest)
+library(rpart)
+library(caret)
+```
+
+
+```{r}
+total_data <-read.csv('total_data.csv',stringsAsFactors = TRUE)
+names(total_data)
+total_data$Home_Win <- as.factor(total_data$Home_Win)
+model_data <- total_data[17:136,]
+rownames(model_data) = 1:nrow(model_data)
+train_data <- model_data[1:106,]
+test_data <- model_data[107:120, ]
+
+summary(train_data$Home_Win)
+summary(test_data$Home_Win)
+```
+```{r}
+set.seed(12345) 
+
+bag_mod <- randomForest(Home_Win ~., # Set tree formula
+                data = train_data[,32:56], # Set dataset
+                mtry = 24, # Set mtry to number of variables 
+                ntree = 120) # Set number of trees to use
+bag_mod
+
+
+```
+```{r}
+
+bag_preds <- predict(bag_mod, test_data) 
+
+t <- table(bag_preds,test_data$Home_Win) 
+confusionMatrix(t,  positive = '1')
+
+
+```
+
+
+```{r}
+oob_error <- bag_mod$err.rate[,1] # Extract oob error
+plot_dat <- cbind.data.frame(rep(1:length(oob_error)), oob_error) # Create plot data
+names(plot_dat) <- c("trees", "oob_error") # Name plot data
+
+
+# Plot oob error
+g_1 <- ggplot(plot_dat, aes(x = trees, y = oob_error)) + # Set x as trees and y as error
+  geom_point(alpha = 0.5, color = "blue") + # Select geom point
+  geom_smooth() + # Add smoothing line
+  theme_bw() + # Set theme
+  theme(panel.grid.major = element_blank(), # Remove grid
+        panel.grid.minor = element_blank(), # Remove grid
+        panel.border = element_blank(), # Remove grid
+        panel.background = element_blank()) + # Remove grid 
+  labs(x = "Number of Trees", title = "Error Rate v Number of Trees",
+       y = "Error Rate")  # Set labels
+g_1
+```
+```{r}
+trees <- c(10, 25, 50, 100, 200, 500, 1000) # Create vector of possible tree sizes
+nodesize <- c(1, 10, 25, 50, 100, 200, 500, 1000) # Create vector of possible node sizes
+
+params <- expand.grid(trees, nodesize) # Expand grid to get data frame of parameter combinations
+names(params) <- c("trees", "nodesize") # Name parameter data frame
+res_vec <- rep(NA, nrow(params)) # Create vector to store accuracy results
+
+for(i in 1:nrow(params)){ # For each set of parameters
+  set.seed(987654) # Set seed for reproducability
+  mod <- randomForest(Home_Win ~. , # Set formula
+                      data=train_data[,32:56],# Set data
+                      mtry = 24, # Set number of variables
+                      importance = FALSE,  # 
+                      ntree = params$trees[i], # Set number of trees
+                      nodesize = params$nodesize[i]) # Set node size
+  res_vec[i] <- 1 - mod$err.rate[nrow(mod$err.rate),1] # Calculate out of bag accuracy
+}
+
+
+```
+
+
+
+```{r}
+res_db <- cbind.data.frame(params, res_vec) # Join parameters and accuracy results
+names(res_db)[3] <- "oob_accuracy" # Name accuracy results column
+res_db
+```
+
+```{r}
+
+res_db$trees <- as.factor(res_db$trees) # Convert tree number to factor for plotting
+res_db$nodesize <- as.factor(res_db$nodesize) # Convert node size to factor for plotting
+g_2 <- ggplot(res_db, aes(y = trees, x = nodesize, fill = oob_accuracy)) + # set aesthetics
+  geom_tile() + # Use geom_tile for heatmap
+  theme_bw() + # Set theme
+  scale_fill_gradient2(low = "blue", # Choose low color
+    mid = "white", # Choose mid color
+    high = "red", # Choose high color
+    midpoint =mean(res_db$oob_accuracy), # Choose mid point
+    space = "Lab", 
+    na.value ="grey", # Choose NA value
+    guide = "colourbar", # Set color bar
+    aesthetics = "fill") + # Select aesthetics to apply
+  labs(x = "Node Size", y = "Number of Trees", fill = "OOB Accuracy") # Set labels
+g_2
+
+
+```
+```{r}
+res_db[which.max(res_db$oob_accuracy),]
+```
+
+```{r}
+
+set.seed(123456)
+bag_mod_3 <- randomForest(Home_Win ~., # Set tree formula
+                data = train_data[,32:56], # Set dataset
+                mtry = 24, # Set number of variables 
+                ntree = 25, # Set number of trees
+                nodesize = 50) # Set node size
+
+bag_preds_3 <- predict(bag_mod_3, test_data) # Create predictions for test data
+
+
+t <- table(bag_preds_3,  test_data$Home_Win) # Create table
+confusionMatrix(t,  positive = "1")
+
+
+```
+

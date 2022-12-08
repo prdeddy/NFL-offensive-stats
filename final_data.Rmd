@@ -1,0 +1,122 @@
+---
+title: "final_data"
+author: "Team X"
+date: "2022-12-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+data <- read.csv('game_level_data.csv',stringsAsFactors = TRUE)
+week_9 <- read.csv('Week 9 Games.csv',stringsAsFactors = TRUE)
+games_9 <- week_9[,'GameID'][1:14]
+zeros <- rep(0,ncol(data)*14)
+df_temp <- data.frame(matrix(zeros, nrow = 14))
+df_temp$X2 <- games_9
+names(df_temp) <- names(data)
+df_temp$homeTeamAbbr <- week_9[,'Hometeamabbr'][1:14]
+df_temp$visitorTeamAbbr <- week_9[,'Awayteam'][1:14]
+df_temp$season <- 2021
+df_temp$week <- 9
+df_temp$Home_Win <- week_9[,'Home_Win'][1:14]
+data <- rbind(data,df_temp)
+data<-data[,2:32]
+
+```
+
+```{r}
+
+home_stats <- names(c(data[,7:12],data[,19:24]))
+away_stats <- names(c(data[,13:18],data[,25:30]))
+
+```
+
+
+
+```{r}
+
+
+for(cols in home_stats){
+
+data$col_1 <- 0
+data$col_2 <- 0
+col_3 <- sprintf("until_home_%s",cols)
+data[[col_3]] <- 0
+for (i in 2:nrow(data))
+  {
+  val = data$homeTeamAbbr[i]
+  count = 0
+  sum = 0
+  for (j in seq(1,i-1)){
+    if (data$homeTeamAbbr[j] == val) {
+      sum = sum + data[[cols]][j]
+      count = count +1}}
+  data$col_1[i] = sum/count
+  val = data$homeTeamAbbr[i]
+  count = 0
+  sum = 0
+  for (j in seq(1,i-1)){
+    if (data$visitorTeamAbbr[j] == val) {
+      sum = sum + data[[cols]][j]
+      count = count +1}}
+  data$col_2[i] = sum/count
+  data[is.na(data)] = 0
+  data[[col_3]][i] = (data$col_1[i] +data$col_2[i])/2
+}
+drops = c('col_1','col_2')
+data <- data[,!(names(data) %in% drops)]
+
+
+}
+```
+
+
+```{r}
+
+
+for(cols in away_stats){
+
+data$col_1 <- 0
+data$col_2 <- 0
+col_3 <- sprintf("until_opp_%s",cols)
+data[[col_3]] <- 0
+for (i in 2:nrow(data))
+  {
+  val = data$homeTeamAbbr[i]
+  count = 0
+  sum = 0
+  for (j in seq(1,i-1)){
+    if (data$homeTeamAbbr[j] == val) {
+      sum = sum + data[[cols]][j]
+      count = count +1}}
+  data$col_1[i] = sum/count
+  val = data$homeTeamAbbr[i]
+  count = 0
+  sum = 0
+  for (j in seq(1,i-1)){
+    if (data$visitorTeamAbbr[j] == val) {
+      sum = sum + data[[cols]][j]
+      count = count +1}}
+  data$col_2[i] = sum/count
+  data[is.na(data)] = 0
+  data[[col_3]][i] = (data$col_1[i] +data$col_2[i])/2
+}
+drops = c('col_1','col_2')
+data <- data[,!(names(data) %in% drops)]
+
+
+}
+
+write.csv(data,'total_data.csv')
+
+```
+
+
+
+
+
+

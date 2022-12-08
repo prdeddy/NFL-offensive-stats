@@ -1,0 +1,99 @@
+---
+title: "draft"
+author: "Team X"
+date: "2022-12-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyquery)
+library(tidyr)
+library(dplyr)
+
+```
+
+```{r}
+
+games <- read.csv('games.csv')
+scout <- read.csv('pffScoutingData.csv')
+plays <- read.csv('plays.csv')
+results <- read.csv('result.csv')
+
+```
+
+
+```{r}
+test <- query("select gameId, possessionTeam, passResult, count(passResult) as passC, avg(playResult) as playR
+      from plays
+      group by gameId, possessionTeam, passResult
+      ")
+
+test <- test %>% pivot_wider(names_from = passResult, values_from = passC)
+test[is.na(test)] <- 0
+test$playR_temp <- test$playR * (test$C + test$I + test$IN + test$R +test$S)
+play_data <- test %>% group_by(gameId, possessionTeam) %>% summarise(playResult = sum(playR_temp), passC = sum(C), passI = sum(I), passIN = sum(IN), passR = sum(R), passS = sum(S))
+head(play_data,10)
+```
+```{r}
+
+kill <- query("select*
+      from games g
+      left join play_data pd
+      on g.gameId = pd.gameId and g.homeTeamAbbr = pd.possessionTeam
+      ")
+
+
+data1 <- query("select k.gameId, k.season, k.week, k.homeTeamAbbr, k.visitorTeamAbbr, k.playResult as playResult, k.passC as passC,k.passI as passI,k.passIN as passIN,k.passR as passR,k.passS as passS,
+pd.playResult as opp_playResult, pd.passC as opp_passC, pd.passI as opp_passI, pd.passIN as opp_passIN, pd.passR as opp_passR, pd.passS as opp_passS
+                from kill k 
+                left join play_data pd
+                on k.gameId = pd.gameId and k.visitorTeamAbbr = pd.possessionTeam
+               ")
+
+data1
+```
+
+
+
+```{r}
+
+scout[is.na(scout)] = 0
+scout1 <- scout %>% group_by(gameId,playId) %>% summarise(hurried = sum(pff_hurry), hit = sum(pff_hit), sacked = sum(pff_sack), hitAllowed = sum(pff_hitAllowed), hurryAllowed = sum(pff_hurryAllowed),sackAllowed = sum(pff_sackAllowed) )
+
+
+result <- merge(scout1, plays, by.x = c("gameId", "playId"), by.y = c("gameId", "playId"), all.x = TRUE)
+result <- result[,c('gameId', 'playId','possessionTeam','hurried', 'hit', 'sacked', 'hitAllowed', 'hurryAllowed','sackAllowed')   ]
+
+```
+
+
+```{r}
+scout_data <- result %>% group_by(gameId,possessionTeam) %>% summarise(hurried = sum(hurried), hit = sum(hit),sacked= sum(sacked), hitAllowed = sum(hitAllowed), hurryAllowed = sum(hurryAllowed), sackallowed = sum(sackAllowed), )
+
+data_inter <- query("select *
+                    from data1 d
+                    left join scout_data sd
+                    on d.gameId = sd.gameId and d.homeTeamAbbr = sd.possessionTeam
+                    ")
+
+data_game_level <- query("select *
+                          from data_inter home 
+                          left join scout_data opp
+                          on home.gameId = opp.gameId and home.visitorTeamAbbr = opp.possessionTeam"
+                          )
+
+results <- results[,c(1,2)]
+data_game_level$new_id <- paste(data_game_level$week,data_game_level$homeTeamAbbr,data_game_level$week,data_game_level$visitorTeamAbbr,sep='_')
+data_game_level <- merge(data_game_level, results, by.x = "new_id", by.y = "GameID", all.x = TRUE)
+
+write.csv(data_game_level, 'game_level_data.csv')
+```
+
+
+
+
+
